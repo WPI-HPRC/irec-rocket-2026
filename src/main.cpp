@@ -16,6 +16,7 @@
 
 #include "LoRaE22.h"
 #include "RadioConfig.h"
+#include <max7456.h>
 
 SPIClass SENSORS_SPI(SENSORS_SPI_MOSI, SENSORS_SPI_MISO, SENSORS_SPI_SCK);
 TwoWire GPS_I2C(GPS_I2C_SDA, GPS_I2C_SCL);
@@ -23,6 +24,8 @@ HardwareSerial GPS_SERIAL(GPS_SERIAL_RX, GPS_SERIAL_TX);
 TwoWire CONNECTOR_I2C(CONNECTOR_I2C_SDA, CONNECTOR_I2C_SCL);
 SPIClass CAMERA_SPI(CAMERA_MOSI, CAMERA_MISO, CAMERA_SCK);
 HardwareSerial RADIO_SERIAL(RADIO_SERIAL_RX, RADIO_SERIAL_TX);
+
+Max7456 videoOSD(&CAMERA_SPI, CAMERA_CS);
 
 Context ctx{
     .asm330 = ASM330(&SENSORS_SPI, SENSORS_ASM_CS),
@@ -92,6 +95,32 @@ bool changeSerialPortConfig(RadioConfigTypes::SerialSpeeds baudRate,
   RADIO_SERIAL.begin(baud, parityConfig);
 
   return true;
+}
+
+void liveVideoInit() {
+  pinMode(MOSFET_GATE, OUTPUT);
+  digitalWrite(MOSFET_GATE, LOW);
+
+  CAMERA_SPI.begin();
+}
+
+void liveVideoTurnOn() { 
+  digitalWrite(MOSFET_GATE, HIGH);
+
+  videoOSD.init(); // this function currently has some really bad delay() in it, we'll probably need to replace those
+
+  videoOSD.setDisplayOffsets(36, 15); // defined from just looking at it
+  videoOSD.activateOSD();
+  // page 19 of the datasheet
+  // low hex digit is column of table, high hex digit is row
+  videoOSD.printMax7456Char(0x15, 0, 0); // K
+  videoOSD.printMax7456Char(0x20, 1, 0); // V
+  videoOSD.printMax7456Char(0x0A, 2, 0); // 0
+  videoOSD.printMax7456Char(0x1C, 3, 0); // R
+}
+
+void liveVideoTurnOff() {
+  digitalWrite(MOSFET_GATE, LOW);
 }
 
 void radioInit() {
@@ -306,9 +335,8 @@ void sensorLoop() {
 }
 
 void setup() {
-  pinMode(MOSFET_GATE, OUTPUT);
-  pinMode(ADC_INP4, INPUT);
-  digitalWrite(MOSFET_GATE, HIGH);
+  liveVideoInit();
+  liveVideoTurnOn();
 
   ctx.currentState = PRELAUNCH;
   data = {};
