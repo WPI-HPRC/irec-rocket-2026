@@ -1,9 +1,9 @@
 #define TEMPLATE_STATES_OVERRIDE
 #include "../State.h"
 
-void coastInit (StateData* data) { }
+void *coastInit (StateData const *data) { return nullptr; }
 
-StateID coastLoop (StateData* data, Context* ctx) {
+StateID coastLoop (StateData const *data, Context* ctx, void *_localData) {
     static bool airBrakesOut = false;
     static bool airBrakesDone = false;
     static double prevAltitude = 0;

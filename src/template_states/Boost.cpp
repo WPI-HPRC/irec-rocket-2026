@@ -4,10 +4,18 @@
 #include "StateMachineConstants.h"
 //#include "../qmekf.h"
 
-void boostInit (StateData* data) {}
+struct BoostData {
+    Debouncer accelDebouncer;
+};
 
-StateID boostLoop (StateData* data, Context* ctx) {
-    static Debouncer accelDebouncer(20);
+void *boostInit (StateData const *data) {
+    BoostData *localData = static_cast<BoostData *>(malloc(sizeof(BoostData)));
+    localData->accelDebouncer = Debouncer(20);
+
+    return localData;
+}
+
+StateID boostLoop (StateData const *data, Context* ctx, void *_localData) {
     /*
     - Poll acceleration data from ctx
     - Check acceleration to detect coast stage
@@ -15,10 +23,11 @@ StateID boostLoop (StateData* data, Context* ctx) {
     - Check if need to abort
     - Update sensor data and ctx for next iteration?
     */
+    BoostData *localData = static_cast<BoostData *>(_localData);
     //const auto &accel_desc = ctx->accel.get_descriptor();
     //StateEstimator state_estimator = ctx->estimator;
     const auto acc_vec = ctx->estimator.get_accel_prev();
-    if (accelDebouncer.update(abs(acc_vec(0, 0)) < COAST_THRESHOLD, millis()) ||  data->currentTime > 2000) {
+    if (localData->accelDebouncer.update(abs(acc_vec(0, 0)) < COAST_THRESHOLD, data->currentTime) ||  data->currentTime > 2000) {
         // check that acceleration up is less than threshold, or
         // current time > 2000
         return COAST;

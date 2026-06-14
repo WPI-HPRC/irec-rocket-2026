@@ -38,6 +38,7 @@ SensorManager mgr{
 };
 
 StateData data;
+void *stateLocalData;
 
 bool changeSerialPortConfig(RadioConfigTypes::SerialSpeeds baudRate,
                             RadioConfigTypes::ParityConfig parity) {
@@ -204,22 +205,6 @@ void radioLoop() {
     ctx.radio.sendMessage(builder.GetBufferPointer(), builder.GetSize());
     loopCount++;
   }
-}
-
-void initStateData(StateData *data) {
-  data->startTime = millis();
-  data->currentTime = 0;
-  data->deltaTime = 0;
-  data->lastLoopTime = 0;
-  data->loopCount = 0;
-};
-
-void updateStateData(StateData *data) {
-  long long now = millis();
-  data->currentTime = now - data->startTime;
-  data->deltaTime = now - data->lastLoopTime;
-  data->lastLoopTime = now;
-  data->loopCount++;
 }
 
 void sensorsSetup() {
@@ -448,11 +433,15 @@ void ekfLoop(Context *ctx) {
 void loop() {
 
   updateStateData(&data);
-  StateID newState = (*loopFuncs[ctx.currentState])(&data, &ctx);
+  StateID newState = (*loopFuncs[ctx.currentState])(&data, &ctx, stateLocalData);
 
   if (ctx.currentState != newState) {
     initStateData(&data);
-    (*initFuncs[newState])(&data);
+
+    if (stateLocalData != nullptr) {
+      free(stateLocalData);
+    }
+    stateLocalData = (*initFuncs[newState])(&data);
     ctx.currentState = newState;
     ctx.debugLogFile.printf("to: %d @ %d\n", newState, millis());
   }

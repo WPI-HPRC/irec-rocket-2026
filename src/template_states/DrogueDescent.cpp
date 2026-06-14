@@ -3,17 +3,26 @@
 #include "../State.h"
 #include "StateMachineConstants.h"
 
-void drogueDescentInit(StateData *data) {}
+struct DrogueDescentData {
+    Debouncer velDebouncer;
+};
 
-StateID drogueDescentLoop (StateData* data, Context* ctx) {
-    static Debouncer accelDebouncer(20);
+void *drogueDescentInit(StateData const *data) {
+    DrogueDescentData *localData = static_cast<DrogueDescentData *>(malloc(sizeof(DrogueDescentData)));
+    localData->velDebouncer = Debouncer(20);
+
+    return localData;
+}
+
+StateID drogueDescentLoop (StateData const *data, Context* ctx, void *_localData) {
+    DrogueDescentData *localData = static_cast<DrogueDescentData *>(_localData);
 
     // under main descent if velocity down is between 16 to 30 fps
     // this is abt 5m/s to 9m/s
     const auto vel_vec = ctx->estimator.get_vel_ned();
     // velocity in the vertical direction is negative
     // going down will be a positive value
-    if(accelDebouncer.update(abs(vel_vec(2, 0)) > MAIN_MIN_VEL, millis()) && abs(vel_vec(2, 0)) < MAIN_MAX_VEL, millis()) {
+    if(localData->velDebouncer.update(abs(vel_vec(2, 0)) > MAIN_MIN_VEL, data->currentTime) && abs(vel_vec(2, 0)) < MAIN_MAX_VEL, data->currentTime) {
         return MAIN_DESCENT;
     }
 

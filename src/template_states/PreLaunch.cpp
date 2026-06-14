@@ -6,10 +6,19 @@
 #include "config.h"
 #include "logging.h"
 
-void prelaunchInit(StateData *data) {}
+struct PrelaunchData {
+  Debouncer accelDebouncer;
+};
 
-StateID prelaunchLoop(StateData *data, Context *ctx) {
-  static Debouncer accelDebouncer(20);
+void *prelaunchInit(StateData const *data) {
+  PrelaunchData *localData = static_cast<PrelaunchData *>(malloc(sizeof(PrelaunchData)));
+  localData->accelDebouncer = Debouncer(20);
+
+  return localData;
+}
+
+StateID prelaunchLoop(StateData const *data, Context *ctx, void *_localData) {
+  PrelaunchData *localData = static_cast<PrelaunchData *>(_localData);
   //static bool ComuteInitialOrientationThisLoop = false;
 
   const auto &accel_desc = ctx->asm330.get_descriptor();
@@ -56,7 +65,7 @@ StateID prelaunchLoop(StateData *data, Context *ctx) {
 
   const auto acc_vec = ctx->estimator.get_accel_prev();
   // check acceleration in vertical direction is greater than threshold
-  if (accelDebouncer.update(abs(acc_vec(0, 0)) > LAUNCH_TRHESHOLD, millis())) {
+  if (localData->accelDebouncer.update(abs(acc_vec(0, 0)) > LAUNCH_TRHESHOLD, data->currentTime)) {
     return BOOST;
   }
 

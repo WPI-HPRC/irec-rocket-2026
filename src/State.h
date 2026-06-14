@@ -13,8 +13,8 @@
 
 #include "Context.h"
 
-typedef void (*StateInitFunc)(StateData *data);
-typedef StateID (*StateLoopFunc)(StateData *data, Context *ctx);
+typedef void* (*StateInitFunc)(StateData const *data);
+typedef StateID (*StateLoopFunc)(StateData const *data, Context *ctx, void *localData);
 
 extern StateInitFunc initFuncs[NUM_STATES];
 extern StateLoopFunc loopFuncs[NUM_STATES];
