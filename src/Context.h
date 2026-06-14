@@ -4,7 +4,7 @@
 #include <Servo.h>
 
 #ifdef __has_include
-#if __has_include("states/States.h")
+#if __has_include("states/States.h") && !defined(TEMPLATE_STATES_OVERRIDE)
 #include "State.h"
 #include "states/States.h"
 #else
