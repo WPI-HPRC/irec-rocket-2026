@@ -1,4 +1,5 @@
 #pragma once
+#include "StateMachineConstants.h"
 
 #ifdef __has_include
   #if defined(TEMPLATE_STATES_OVERRIDE) || !__has_include("states/States.h")

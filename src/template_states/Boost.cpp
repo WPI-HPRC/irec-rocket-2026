@@ -1,7 +1,6 @@
 #include "debouncer.h"
 #define TEMPLATE_STATES_OVERRIDE
 #include "../State.h"
-#include "StateMachineConstants.h"
 //#include "../qmekf.h"
 
 struct BoostData {
@@ -30,6 +29,10 @@ StateID boostLoop (StateData const *data, Context* ctx, void *_localData) {
     if (localData->accelDebouncer.update(abs(acc_vec(0, 0)) < COAST_THRESHOLD, data->currentTime) ||  data->currentTime > 2000) {
         // check that acceleration up is less than threshold, or
         // current time > 2000
+        return COAST;
+    }
+
+    if(data->currentTime > BOOST_TIMEOUT) {
         return COAST;
     }
 

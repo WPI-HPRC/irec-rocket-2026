@@ -144,6 +144,7 @@ void applyRemoteCommand(hprc::Command command) {
   case hprc::Command_RemoteStartOn:
     Log.infoln("Remote start on flag set");
     ctx.commands.remoteStartActive = true;
+    ctx.liveVideoStart = millis();
     digitalWrite(MOSFET_GATE, HIGH);
     break;
   case hprc::Command_RemoteStartOff:
@@ -518,7 +519,6 @@ StateID applyCommandEffects(StateID proposedState) {
 }
 
 void loop() {
-
   updateStateData(&data);
   StateID newState = (*loopFuncs[ctx.currentState])(&data, &ctx, stateLocalData);
   newState = applyCommandEffects(newState);
@@ -546,4 +546,10 @@ void loop() {
   }
 
   loggingLoop(&ctx);
+
+  // Turn off live video if its been a while
+  if(millis() - ctx.liveVideoStart  > MAX_LIVE_VIDEO_DURATION) {
+    ctx.commands.remoteStartActive = false;
+    digitalWrite(MOSFET_GATE, LOW);
+  }
 }

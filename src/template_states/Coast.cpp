@@ -27,5 +27,9 @@ StateID coastLoop (StateData const *data, Context* ctx, void *_localData) {
         return DROGUE_DESCENT;
     }
 
+    if(data->currentTime > COAST_TIMEOUT) {
+        return DROGUE_DESCENT;
+    }
+
     return COAST;
 }

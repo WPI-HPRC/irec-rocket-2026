@@ -24,5 +24,9 @@ StateID mainDescentLoop (StateData const *data, Context* ctx, void *_localData) 
         return RECOVERY;
     }
 
+    if(data->currentTime > MAIN_DESCENT_TIMEOUT) {
+        return RECOVERY;
+    }
+
     return MAIN_DESCENT;
 }

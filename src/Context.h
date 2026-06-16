@@ -36,6 +36,8 @@ struct INA219Data;
 
 #define LOG_FILE_BUFFER_SIZE 16000
 
+#define MAX_LIVE_VIDEO_DURATION 600000
+
 struct RemoteCommandState {
     // last applied command
     uint16_t lastCommandNumber = 0;
@@ -75,4 +77,6 @@ struct Context {
     RemoteCommandState commands;
 
     SplitStateEstimator estimator;
+
+    int liveVideoStart;
 };

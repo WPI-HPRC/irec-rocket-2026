@@ -28,5 +28,9 @@ StateID drogueDescentLoop (StateData const *data, Context* ctx, void *_localData
         return MAIN_DESCENT;
     }
 
+    if(data->currentTime > DROGUE_DESCENT_TIMEOUT) {
+        return MAIN_DESCENT;
+    }
+
     return DROGUE_DESCENT;
 }
