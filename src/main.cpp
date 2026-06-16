@@ -496,7 +496,7 @@ StateID applyCommandEffects(StateID proposedState) {
   if (ctx.commands.estimatorRequested) {
     ctx.commands.estimatorRequested = false;
     ctx.ekfLooping = true;
-    Log.infoln("Estimator Requested!")
+    Log.infoln("Estimator Requested!");
   }
 
   // its so over
