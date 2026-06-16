@@ -31,6 +31,7 @@ Context ctx{
     .mag = LIS2MDL(&SENSORS_SPI, SENSORS_LIS_CS),
     .gps = LIV3F(GPS_SERIAL),
     .radio = LoRaE22(&RADIO_SERIAL, RADIO_M0, RADIO_M1, RADIO_AUX, "KV0R"),
+    .armed = false;
 };
 
 SensorManager mgr{
