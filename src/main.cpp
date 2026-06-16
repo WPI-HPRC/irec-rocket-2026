@@ -130,26 +130,33 @@ void radioInit() {
 void applyRemoteCommand(hprc::Command command) {
   switch (command) {
   case hprc::Command_ArmFlight:
+    Log.infoln("Arm flag set");
     ctx.commands.armed = true;
     break;
   case hprc::Command_DeArmFlight:
+    Log.infoln("Dearmed flag set");
     ctx.commands.armed = false;
     break;
   case hprc::Command_Reset:
+    Log.infoln("Reset flag set");
     ctx.commands.resetRequested = true;
     break;
   case hprc::Command_RemoteStartOn:
+    Log.infoln("Remote start on flag set");
     ctx.commands.remoteStartActive = true;
     digitalWrite(MOSFET_GATE, HIGH);
     break;
   case hprc::Command_RemoteStartOff:
+    Log.infoln("Remote start off flag set");
     ctx.commands.remoteStartActive = false;
     digitalWrite(MOSFET_GATE, LOW);
     break;
   case hprc::Command_StartEstimator:
+    Log.infoln("Start estimator flag set");
     ctx.commands.estimatorRequested = true;
     break;
   case hprc::Command_Abort:
+    Log.infoln("Abort flag set");
     ctx.commands.abortRequested = true;
     break;
   default:
@@ -387,7 +394,7 @@ void setup() {
   digitalWrite(LED_RED, HIGH);
 
   Serial.begin(115200);
-  // radioInit();
+  radioInit();
 
   while (!Serial) {
     delay(10);
@@ -489,11 +496,13 @@ StateID applyCommandEffects(StateID proposedState) {
   if (ctx.commands.estimatorRequested) {
     ctx.commands.estimatorRequested = false;
     ctx.ekfLooping = true;
+    Log.infoln("Estimator Requested!")
   }
 
   // its so over
   if (ctx.commands.abortRequested) {
     ctx.commands.abortRequested = false;
+    Log.infoln("Abort Requested!");
     return ABORT;
   }
 
@@ -501,6 +510,7 @@ StateID applyCommandEffects(StateID proposedState) {
   if (ctx.commands.resetRequested) {
     ctx.commands.resetRequested = false;
     ctx.commands.armed = false;
+    Log.infoln("Reset Requested!");
     return PRELAUNCH;
   }
 
@@ -527,7 +537,7 @@ void loop() {
   sensorLoop();
 
   // NOTE: this is needed for radio
-  // radioLoop();
+  radioLoop();
 
   // there is something up in hte ekf looping func
   // linker gets sad
