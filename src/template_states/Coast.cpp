@@ -4,10 +4,6 @@
 void *coastInit (StateData const *data) { return nullptr; }
 
 StateID coastLoop (StateData const *data, Context* ctx, void *_localData) {
-    static bool airBrakesOut = false;
-    static bool airBrakesDone = false;
-    static double prevAltitude = 0;
-
     /*
     - Poll acceleration data from ctx
     - Check acceleration to detect drouge deployment
@@ -25,10 +21,9 @@ StateID coastLoop (StateData const *data, Context* ctx, void *_localData) {
     //    }
     //    prevAltitude = currentAltitiude;
     //}
-    const auto acc_vec = ctx->estimator.get_vel_ned();
-    if(acc_vec(2, 0) < 0.2 && acc_vec(2, 0) > -0.2 && airBrakesDone) {
-        // check acceleration down in NED frame is between 0.2 and -0.2
-        // and airbreaks done
+    const auto vel_vec = ctx->estimator.get_vel_ned();
+    // apogee: vertical NED velocity has dropped to near zero (between -0.2 and 0.2)
+    if(vel_vec(2, 0) < 0.2 && vel_vec(2, 0) > -0.2) {
         return DROGUE_DESCENT;
     }
 

@@ -409,7 +409,7 @@ void setup() {
 
   // NOTE: Run initialization on the first state
   initStateData(&data);
-  (*initFuncs[ctx.currentState])(&data);
+  stateLocalData = (*initFuncs[ctx.currentState])(&data);
 
   // ctx.estimator = SplitStateEstimator();
 
@@ -472,7 +472,7 @@ void ekfLoop(Context *ctx) {
   if (baro_desc.getLastUpdated() > last_baro_time) {
     last_baro_time = baro_desc.getLastUpdated();
     BLA::Matrix<1, 1> baro = {baro_desc.data.pressure};
-    ctx->estimator.runBaroUpdate(baro, now);
+    //ctx->estimator.runBaroUpdate(baro, now);
     ctx->estimator.set_curr_temp(baro_desc.data.temp);
   }
 
@@ -539,7 +539,7 @@ void loop() {
 
   // there is something up in hte ekf looping func
   // linker gets sad
-  if (false && ctx.ekfLooping) {
+  if (ctx.ekfLooping) {
     ekfLoop(&ctx);
   }
 
