@@ -124,14 +124,81 @@ void radioInit() {
   Log.infoln("radio init done, code: %d", code);
 }
 
+// Translate a decoded wire Command into latched intents on the Context. The
+// flight state machine reads these flags (and clears the one-shot requests).
+void applyRemoteCommand(hprc::Command command) {
+  switch (command) {
+  case hprc::Command_ArmFlight:
+    ctx.commands.armed = true;
+    break;
+  case hprc::Command_DeArmFlight:
+    ctx.commands.armed = false;
+    break;
+  case hprc::Command_Reset:
+    ctx.commands.resetRequested = true;
+    break;
+  case hprc::Command_RemoteStartOn:
+    ctx.commands.remoteStartActive = true;
+    break;
+  case hprc::Command_RemoteStartOff:
+    ctx.commands.remoteStartActive = false;
+    break;
+  case hprc::Command_StartEstimator:
+    ctx.commands.estimatorRequested = true;
+    break;
+  case hprc::Command_Abort:
+    ctx.commands.abortRequested = true;
+    break;
+  default:
+    // Canards-specific commands are not handled on this (30K) airframe.
+    Log.warningln("radio: ignoring unhandled command %d", (int)command);
+    break;
+  }
+}
+
+// Drain every fully-framed message the driver currently has, decode any
+// RemoteControlCommand packets, and apply them. Deduplicated on command_number
+// so a command repeated by the ground station is only acted on once.
+void handleRemoteCommands(uint8_t *rxBuff, size_t rxBuffLen) {
+  uint8_t messageLength = 0;
+  while (ctx.radio.hasMessage() &&
+         ctx.radio.getMessage(rxBuff, rxBuffLen, messageLength)) {
+    flatbuffers::Verifier verifier(rxBuff, messageLength);
+    if (!hprc::VerifyPacketBuffer(verifier)) {
+      Log.warningln("radio: dropped malformed packet (%d bytes)", messageLength);
+      continue;
+    }
+
+    const hprc::Packet *packet = hprc::GetPacket(rxBuff);
+    const hprc::RemoteControlCommand *cmd = packet->packet_as_RemoteControl();
+    if (cmd == nullptr) {
+      // Some other packet type (e.g. another rocket's telemetry); ignore.
+      continue;
+    }
+
+    uint16_t cmdNum = cmd->command_number();
+    if (cmdNum == ctx.commands.lastCommandNumber) {
+      continue; // already handled this command
+    }
+    ctx.commands.lastCommandNumber = cmdNum;
+
+    Log.infoln("radio: command #%u -> %s", cmdNum,
+               hprc::EnumNameCommand(cmd->command()));
+    applyRemoteCommand(cmd->command());
+  }
+}
+
 void radioLoop() {
   static flatbuffers::FlatBufferBuilder builder;
   static uint8_t rxBuff[1024];
-  static uint16_t lastCmdNum = 0;
   static uint32_t lastRadioSendTime = 0;
   static uint32_t loopCount = 0;
 
+  // get new messages if there are any
   ctx.radio.update();
+
+  // check for remote commands and apply any we received
+  handleRemoteCommands(rxBuff, sizeof(rxBuff));
 
   if (millis() - lastRadioSendTime >= 200) {
     lastRadioSendTime = millis();
@@ -194,7 +261,7 @@ void radioLoop() {
 
     hprc::Shared sharedData;
     sharedData.mutate_time_from_boot(millis());
-    sharedData.mutate_last_command_received(lastCmdNum);
+    sharedData.mutate_last_command_received(ctx.commands.lastCommandNumber);
     sharedData.mutate_sd_file_no(ctx.logFileIdx);
     sharedData.mutate_loop_count(loopCount);
 
