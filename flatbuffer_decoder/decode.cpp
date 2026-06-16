@@ -35,6 +35,8 @@ int main(int argc, char **argv) {
   fprintf(lps22, "timestamp,pressure,temp\n");
   FILE *liv3f = fopen("decoded/liv3f.csv", "w");
   fprintf(liv3f, "timestamp,lat,lon,alt,satellites,epochTime\n");
+  FILE *ekf = fopen("decoded/ekf.csv", "w");
+  fprintf(ekf, "timestamp,qw,qi,qj,qk,posX,posY,posZ,velX,velY,velZ\n");
 
   char buff[1024];
 
@@ -63,6 +65,7 @@ int main(int argc, char **argv) {
     head += nextPacketSize;
     const Sensors *sensors = packet->sensors();
 
+    if (sensors != nullptr) {
     if (sensors->asm330() != nullptr) {
       fprintf(asm330, "%d,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f\n", packet->timestamp(),
               sensors->asm330()->accel0(), sensors->asm330()->accel1(),
@@ -89,6 +92,14 @@ int main(int argc, char **argv) {
               sensors->liv3f()->lat(), sensors->liv3f()->lon(),
               sensors->liv3f()->alt(), sensors->liv3f()->satellites(),
               sensors->liv3f()->epoch_time());
+    }
+    }
+
+    if (packet->ekf() != nullptr) {
+      const EKF *e = packet->ekf();
+      fprintf(ekf, "%d,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f,%.8f\n",
+              packet->timestamp(), e->w(), e->i(), e->j(), e->k(), e->pos_x(),
+              e->pos_y(), e->pos_z(), e->vel_x(), e->vel_y(), e->vel_z());
     }
   }
 
