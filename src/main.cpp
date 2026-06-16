@@ -40,6 +40,8 @@ SensorManager mgr{
 StateData data;
 void *stateLocalData;
 
+float ekfStartTime = 0;
+
 bool changeSerialPortConfig(RadioConfigTypes::SerialSpeeds baudRate,
                             RadioConfigTypes::ParityConfig parity) {
   // this is safe to call even when the port is not open.
@@ -411,86 +413,57 @@ void setup() {
   initStateData(&data);
   stateLocalData = (*initFuncs[ctx.currentState])(&data);
 
-  // ctx.estimator = SplitStateEstimator();
-
-  BLA::Matrix<3, 1> ecef = {0, 0, 0};
-  // ctx.estimator.init(ecef, millis());
+  ctx.estimator.init(millis() / 1000.0f, {0, 0, 0}, {0, 0, 0});
+  ekfStartTime = millis() / 1000.0f;
+  ctx.ekfLooping = true;
 
   digitalWrite(LED_GREEN, HIGH);
   Log.infoln("=== Starting main loop ===\n");
 }
 
 void ekfLoop(Context *ctx) {
-  static uint32_t last_accel_time = 0;
-  static uint32_t last_mag_time = 0;
-  static uint32_t last_gps_time = 0;
-  static uint32_t last_baro_time = 0;
+  static int state = 0;
+  static BLA::Matrix<6, 1> lastCalcTimes = {0, 0, 0, 0, 0, 0};
+  static BLA::Matrix<6, 1> runRates = {0.001, 0.03, 0.03, 0.5, 1, 1};
 
-  uint32_t now = millis();
+  // seconds since the EKF started
+  float t = millis() / 1000.0f - ekfStartTime;
 
   const auto &asm330_desc = ctx->asm330.get_descriptor();
-  const auto &baro_desc = ctx->baro.get_descriptor();
   const auto &mag_desc = ctx->mag.get_descriptor();
-  const auto &gps_desc = ctx->gps.get_descriptor();
 
-  bool inAir = ctx->currentState == BOOST || ctx->currentState == COAST ||
-               ctx->currentState == DROGUE_DESCENT || ctx->currentState == MAIN_DESCENT;
+  BLA::Matrix<3, 1> accel = {asm330_desc.data.accel0, asm330_desc.data.accel1,
+                             asm330_desc.data.accel2};
+  BLA::Matrix<3, 1> gyro = {asm330_desc.data.gyr0, asm330_desc.data.gyr1,
+                            asm330_desc.data.gyr2};
+  BLA::Matrix<3, 1> mag = {mag_desc.data.mag0, mag_desc.data.mag1,
+                           mag_desc.data.mag2};
 
-  // Accel and gyro becuase they are on the same sensor
-  if (asm330_desc.getLastUpdated() > last_accel_time) {
-    BLA::Matrix<3, 1> gyro = {asm330_desc.data.gyr0, asm330_desc.data.gyr1,
-                              asm330_desc.data.gyr2};
-    ctx->estimator.fastGyroProp(gyro, now);
-
-    BLA::Matrix<3, 1> accel = {asm330_desc.data.accel0, asm330_desc.data.accel1,
-                               asm330_desc.data.accel2};
-    ctx->estimator.fastAccelProp(accel, now);
-  }
-
-  if (inAir) {
-    if (baro_desc.getLastUpdated() > last_baro_time ||
-        mag_desc.getLastUpdated() > last_mag_time ||
-        gps_desc.getLastUpdated() > last_gps_time) {
-      ctx->estimator.PVekfPredict(now);
+  if (state == 0) {
+    if (t > 5.0f) {
+      state = 1;
     }
-  } else {
-    if (asm330_desc.getLastUpdated() > last_accel_time ||
-        baro_desc.getLastUpdated() > last_baro_time ||
-        mag_desc.getLastUpdated() > last_mag_time ||
-        gps_desc.getLastUpdated() > last_gps_time) {
-      ctx->estimator.PVekfPredict(now);
+    ctx->estimator.computeInitialOrientation(ctx->estimator.reorient_asm(accel),
+                                             ctx->estimator.reorient_lis(mag),
+                                             t);
+    lastCalcTimes = {t, t, t, t, t, t};
+  } else if (state == 1) {
+    if (t > 35.0f) {
+      state = 2;
+    }
+    if (t - lastCalcTimes(0, 0) >= runRates(0, 0)) {
+      ctx->estimator.fastGyroProp(ctx->estimator.reorient_asm(gyro), t);
+      ctx->estimator.AttekfPredict(t);
+      ctx->estimator.runAccelMagUpdate(ctx->estimator.reorient_asm(accel),
+                                       ctx->estimator.reorient_lis(mag), t);
+      lastCalcTimes(0, 0) = t;
+    }
+  } else if (state == 2) {
+    if (t - lastCalcTimes(0, 0) >= runRates(0, 0)) {
+      ctx->estimator.fastGyroProp(ctx->estimator.reorient_asm(gyro), t);
+      lastCalcTimes(0, 0) = t;
     }
   }
-
-  if (asm330_desc.getLastUpdated() > last_accel_time) {
-    last_accel_time = asm330_desc.getLastUpdated();
-    BLA::Matrix<3, 1> accel = {asm330_desc.data.accel0, asm330_desc.data.accel1,
-                               asm330_desc.data.accel2};
-    ctx->estimator.runAccelUpdate(accel, now);
-  }
-
-  if (baro_desc.getLastUpdated() > last_baro_time) {
-    last_baro_time = baro_desc.getLastUpdated();
-    BLA::Matrix<1, 1> baro = {baro_desc.data.pressure};
-    //ctx->estimator.runBaroUpdate(baro, now);
-    ctx->estimator.set_curr_temp(baro_desc.data.temp);
-  }
-
-  if (mag_desc.getLastUpdated() > last_mag_time) {
-    last_mag_time = mag_desc.getLastUpdated();
-    BLA::Matrix<3, 1> mag = {mag_desc.data.mag0, mag_desc.data.mag1,
-                             mag_desc.data.mag2};
-    ctx->estimator.runMagUpdate(mag, now);
-  }
-
-  // if (gps_desc.getLastUpdated() > last_gps_time)
-  // {
-  //     last_gps_time = gps_desc.getLastUpdated();
-  //     BLA::Matrix<3, 1> gpsPos = {gps_desc.data.ecefX, gps_desc.data.ecefY,
-  //     gps_desc.data.ecefZ}; BLA::Matrix<3, 1> gpsVel = {gps_desc.data.velN,
-  //     gps_desc.data.velE, gps_desc.data.velD};
-  //     ctx->estimator.runGPSUpdate(gpsPos, gpsVel, false, now);
-  // }
 }
 
 StateID applyCommandEffects(StateID proposedState) {

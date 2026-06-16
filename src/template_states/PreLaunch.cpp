@@ -8,13 +8,11 @@
 
 struct PrelaunchData {
   Debouncer accelDebouncer;
-  bool estimatorInitialized;
 };
 
 void *prelaunchInit(StateData const *data) {
   PrelaunchData *localData = static_cast<PrelaunchData *>(malloc(sizeof(PrelaunchData)));
   localData->accelDebouncer = Debouncer(20);
-  localData->estimatorInitialized = false;
 
   return localData;
 }
@@ -40,14 +38,8 @@ StateID prelaunchLoop(StateData const *data, Context *ctx, void *_localData) {
     return PRELAUNCH;
   }
 
-  // After a 5 second settle on the pad, initialise the estimator once from the
-  // current (static) accel + mag readings, then start the EKF loop. init() uses
-  // the same millis() clock that ekfLoop() propagates against.
-  if (!localData->estimatorInitialized && data->currentTime > 5000) {
-    ctx->estimator.init(millis(), accel, mag);
-    ctx->ekfLooping = true;
-    localData->estimatorInitialized = true;
-  }
+  // Estimator init + ekfLooping are handled in setup() (see ekfLoop), matching
+  // the canard implementation, so nothing to do here on the pad.
 
   /*
   - Poll acceleration data from ctx
