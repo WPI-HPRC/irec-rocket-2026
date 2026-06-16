@@ -22,3 +22,4 @@
 #endif
 
 #define LOG_FOLDER_NAME "flightData"
+#define MOSFET_GATE_DEFAULT_STATE LOW

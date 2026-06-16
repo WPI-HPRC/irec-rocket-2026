@@ -31,7 +31,6 @@ Context ctx{
     .mag = LIS2MDL(&SENSORS_SPI, SENSORS_LIS_CS),
     .gps = LIV3F(GPS_SERIAL),
     .radio = LoRaE22(&RADIO_SERIAL, RADIO_M0, RADIO_M1, RADIO_AUX, "KV0R"),
-    .armed = false;
 };
 
 SensorManager mgr{
@@ -125,8 +124,7 @@ void radioInit() {
   Log.infoln("radio init done, code: %d", code);
 }
 
-// Translate a decoded wire Command into latched intents on the Context. The
-// flight state machine reads these flags (and clears the one-shot requests).
+// apply remote commadns, one shot are reset after exec
 void applyRemoteCommand(hprc::Command command) {
   switch (command) {
   case hprc::Command_ArmFlight:
@@ -140,9 +138,11 @@ void applyRemoteCommand(hprc::Command command) {
     break;
   case hprc::Command_RemoteStartOn:
     ctx.commands.remoteStartActive = true;
+    digitalWrite(MOSFET_GATE, HIGH);
     break;
   case hprc::Command_RemoteStartOff:
     ctx.commands.remoteStartActive = false;
+    digitalWrite(MOSFET_GATE, LOW);
     break;
   case hprc::Command_StartEstimator:
     ctx.commands.estimatorRequested = true;
@@ -151,15 +151,11 @@ void applyRemoteCommand(hprc::Command command) {
     ctx.commands.abortRequested = true;
     break;
   default:
-    // Canards-specific commands are not handled on this (30K) airframe.
     Log.warningln("radio: ignoring unhandled command %d", (int)command);
     break;
   }
 }
 
-// Drain every fully-framed message the driver currently has, decode any
-// RemoteControlCommand packets, and apply them. Deduplicated on command_number
-// so a command repeated by the ground station is only acted on once.
 void handleRemoteCommands(uint8_t *rxBuff, size_t rxBuffLen) {
   uint8_t messageLength = 0;
   while (ctx.radio.hasMessage() &&
@@ -173,7 +169,6 @@ void handleRemoteCommands(uint8_t *rxBuff, size_t rxBuffLen) {
     const hprc::Packet *packet = hprc::GetPacket(rxBuff);
     const hprc::RemoteControlCommand *cmd = packet->packet_as_RemoteControl();
     if (cmd == nullptr) {
-      // Some other packet type (e.g. another rocket's telemetry); ignore.
       continue;
     }
 
@@ -376,7 +371,7 @@ void sensorLoop() {
 void setup() {
   pinMode(MOSFET_GATE, OUTPUT);
   pinMode(ADC_INP4, INPUT);
-  digitalWrite(MOSFET_GATE, HIGH);
+  digitalWrite(MOSFET_GATE, MOSFET_GATE_DEFAULT_STATE);
 
   ctx.currentState = PRELAUNCH;
   data = {};
@@ -498,10 +493,33 @@ void ekfLoop(Context *ctx) {
   // }
 }
 
+StateID applyCommandEffects(StateID proposedState) {
+  if (ctx.commands.estimatorRequested) {
+    ctx.commands.estimatorRequested = false;
+    ctx.ekfLooping = true;
+  }
+
+  // its so over
+  if (ctx.commands.abortRequested) {
+    ctx.commands.abortRequested = false;
+    return ABORT;
+  }
+
+  // reset, back to no arm prelaunch
+  if (ctx.commands.resetRequested) {
+    ctx.commands.resetRequested = false;
+    ctx.commands.armed = false;
+    return PRELAUNCH;
+  }
+
+  return proposedState;
+}
+
 void loop() {
 
   updateStateData(&data);
   StateID newState = (*loopFuncs[ctx.currentState])(&data, &ctx, stateLocalData);
+  newState = applyCommandEffects(newState);
 
   if (ctx.currentState != newState) {
     initStateData(&data);
@@ -516,8 +534,11 @@ void loop() {
 
   sensorLoop();
 
+  // NOTE: this is needed for radio
   // radioLoop();
 
+  // there is something up in hte ekf looping func
+  // linker gets sad
   if (false && ctx.ekfLooping) {
     ekfLoop(&ctx);
   }

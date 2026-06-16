@@ -34,7 +34,7 @@ StateID prelaunchLoop(StateData const *data, Context *ctx, void *_localData) {
   //                          gps_desc.data.ecefZ};
 
   // Stay in PRELAUNCH if not armed
-  if(!ctx->armed) {
+  if(!ctx->commands.armed) {
     return PRELAUNCH;
   }
 
