@@ -425,12 +425,14 @@ void ekfLoop(Context *ctx) {
   static int state = 0;
   static BLA::Matrix<6, 1> lastCalcTimes = {0, 0, 0, 0, 0, 0};
   static BLA::Matrix<6, 1> runRates = {0.001, 0.03, 0.03, 0.5, 1, 1};
+  static uint32_t last_baro_time = 0;
 
   // seconds since the EKF started
   float t = millis() / 1000.0f - ekfStartTime;
 
   const auto &asm330_desc = ctx->asm330.get_descriptor();
   const auto &mag_desc = ctx->mag.get_descriptor();
+  const auto &baro_desc = ctx->baro.get_descriptor();
 
   BLA::Matrix<3, 1> accel = {asm330_desc.data.accel0, asm330_desc.data.accel1,
                              asm330_desc.data.accel2};
@@ -453,14 +455,31 @@ void ekfLoop(Context *ctx) {
     }
     if (t - lastCalcTimes(0, 0) >= runRates(0, 0)) {
       ctx->estimator.fastGyroProp(ctx->estimator.reorient_asm(gyro), t);
+      // Propagate the accelerometer (populates accel_prev for launch detection
+      // and dead-reckons vel/pos) and predict the PV covariance.
+      ctx->estimator.fastAccelProp(ctx->estimator.reorient_asm(accel), t);
+      ctx->estimator.PVekfPredict(t);
       ctx->estimator.AttekfPredict(t);
       ctx->estimator.runAccelMagUpdate(ctx->estimator.reorient_asm(accel),
                                        ctx->estimator.reorient_lis(mag), t);
+      // Barometric correction for vertical velocity/position (no GPS).
+      if (baro_desc.getLastUpdated() > last_baro_time) {
+        last_baro_time = baro_desc.getLastUpdated();
+        ctx->estimator.runBaroUpdate({baro_desc.data.pressure}, t);
+        ctx->estimator.set_curr_temp(baro_desc.data.temp);
+      }
       lastCalcTimes(0, 0) = t;
     }
   } else if (state == 2) {
     if (t - lastCalcTimes(0, 0) >= runRates(0, 0)) {
       ctx->estimator.fastGyroProp(ctx->estimator.reorient_asm(gyro), t);
+      ctx->estimator.fastAccelProp(ctx->estimator.reorient_asm(accel), t);
+      ctx->estimator.PVekfPredict(t);
+      if (baro_desc.getLastUpdated() > last_baro_time) {
+        last_baro_time = baro_desc.getLastUpdated();
+        ctx->estimator.runBaroUpdate({baro_desc.data.pressure}, t);
+        ctx->estimator.set_curr_temp(baro_desc.data.temp);
+      }
       lastCalcTimes(0, 0) = t;
     }
   }
