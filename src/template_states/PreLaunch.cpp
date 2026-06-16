@@ -33,6 +33,11 @@ StateID prelaunchLoop(StateData const *data, Context *ctx, void *_localData) {
   // BLA::Matrix<3, 1> gps = {gps_desc.data.ecefX, gps_desc.data.ecefY,
   //                          gps_desc.data.ecefZ};
 
+  // Stay in PRELAUNCH if not armed
+  if(!ctx->armed) {
+    return PRELAUNCH;
+  }
+
   // Pad loop for 2 seconds after 5 second delay
   if (data->currentTime > 5000 && data->currentTime < 7000) {
     // ctx->estimator.padLoop(accel, mag, gps);

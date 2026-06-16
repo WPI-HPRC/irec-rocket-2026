@@ -75,4 +75,6 @@ struct Context {
     RemoteCommandState commands;
 
     SplitStateEstimator estimator;
+
+    bool armed;
 };
