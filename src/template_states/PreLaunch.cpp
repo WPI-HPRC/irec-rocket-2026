@@ -8,11 +8,13 @@
 
 struct PrelaunchData {
   Debouncer accelDebouncer;
+  bool estimatorInitialized;
 };
 
 void *prelaunchInit(StateData const *data) {
   PrelaunchData *localData = static_cast<PrelaunchData *>(malloc(sizeof(PrelaunchData)));
   localData->accelDebouncer = Debouncer(20);
+  localData->estimatorInitialized = false;
 
   return localData;
 }
@@ -38,21 +40,14 @@ StateID prelaunchLoop(StateData const *data, Context *ctx, void *_localData) {
     return PRELAUNCH;
   }
 
-  // Pad loop for 2 seconds after 5 second delay
-  if (data->currentTime > 5000 && data->currentTime < 7000) {
-    // ctx->estimator.padLoop(accel, mag, gps);
-    //ComuteInitialOrientationThisLoop = true;
-
-    // ctx->estimator.computeInitialOrientation();
-    //ComuteInitialOrientationThisLoop = false;
-    // ctx->ekfLooping = true;
+  // After a 5 second settle on the pad, initialise the estimator once from the
+  // current (static) accel + mag readings, then start the EKF loop. init() uses
+  // the same millis() clock that ekfLoop() propagates against.
+  if (!localData->estimatorInitialized && data->currentTime > 5000) {
+    ctx->estimator.init(millis(), accel, mag);
+    ctx->ekfLooping = true;
+    localData->estimatorInitialized = true;
   }
-
-  //if (ComuteInitialOrientationThisLoop == true) {
-  //  ctx->estimator.computeInitialOrientation();
-  //  ComuteInitialOrientationThisLoop = false;
-  //  ctx->ekfLooping = true;
-  //}
 
   /*
   - Poll acceleration data from ctx
