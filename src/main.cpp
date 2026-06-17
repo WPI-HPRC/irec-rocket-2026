@@ -479,7 +479,7 @@ void ekfLoop(Context *ctx) {
       // Barometric correction for vertical velocity/position (no GPS).
       if (baro_desc.getLastUpdated() > last_baro_time) {
         last_baro_time = baro_desc.getLastUpdated();
-        ctx->estimator.runBaroUpdate({baro_desc.data.pressure}, t);
+        // ctx->estimator.runBaroUpdate({baro_desc.data.pressure}, t);
         ctx->estimator.set_curr_temp(baro_desc.data.temp);
       }
       lastCalcTimes(0, 0) = t;
@@ -489,11 +489,11 @@ void ekfLoop(Context *ctx) {
       ctx->estimator.fastGyroProp(ctx->estimator.reorient_asm(gyro), t);
       ctx->estimator.fastAccelProp(ctx->estimator.reorient_asm(accel), t);
       ctx->estimator.PVekfPredict(t);
-      if (baro_desc.getLastUpdated() > last_baro_time) {
-        last_baro_time = baro_desc.getLastUpdated();
-        ctx->estimator.runBaroUpdate({baro_desc.data.pressure}, t);
-        ctx->estimator.set_curr_temp(baro_desc.data.temp);
-      }
+      // if (baro_desc.getLastUpdated() > last_baro_time) {
+      //   last_baro_time = baro_desc.getLastUpdated();
+      //   ctx->estimator.runBaroUpdate({baro_desc.data.pressure}, t);
+      //   ctx->estimator.set_curr_temp(baro_desc.data.temp);
+      // }
       lastCalcTimes(0, 0) = t;
     }
   }
