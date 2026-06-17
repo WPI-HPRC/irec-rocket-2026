@@ -168,30 +168,36 @@ void applyRemoteCommand(hprc::Command command) {
 
 void handleRemoteCommands(uint8_t *rxBuff, size_t rxBuffLen) {
   uint8_t messageLength = 0;
-  while (ctx.radio.hasMessage() &&
-         ctx.radio.getMessage(rxBuff, rxBuffLen, messageLength)) {
-    flatbuffers::Verifier verifier(rxBuff, messageLength);
-    if (!hprc::VerifyPacketBuffer(verifier)) {
-      Log.warningln("radio: dropped malformed packet (%d bytes)", messageLength);
-      continue;
-    }
 
-    const hprc::Packet *packet = hprc::GetPacket(rxBuff);
-    const hprc::RemoteControlCommand *cmd = packet->packet_as_RemoteControl();
-    if (cmd == nullptr) {
-      continue;
-    }
-
-    uint16_t cmdNum = cmd->command_number();
-    if (cmdNum == ctx.commands.lastCommandNumber) {
-      continue; // already handled this command
-    }
-    ctx.commands.lastCommandNumber = cmdNum;
-
-    Log.infoln("radio: command #%u -> %s", cmdNum,
-               hprc::EnumNameCommand(cmd->command()));
-    applyRemoteCommand(cmd->command());
+  if (!ctx.radio.hasMessage() || !ctx.radio.getMessage(rxBuff, rxBuffLen, messageLength)) {
+    return;
   }
+
+  if (messageLength == 0 ) {
+    return;
+  }
+
+  flatbuffers::Verifier verifier(rxBuff, messageLength);
+  if (!hprc::VerifyPacketBuffer(verifier)) {
+    Log.warningln("radio: dropped malformed packet (%d bytes)", messageLength);
+    return;
+  }
+
+  const hprc::Packet *packet = hprc::GetPacket(rxBuff);
+  const hprc::RemoteControlCommand *cmd = packet->packet_as_RemoteControl();
+
+  if (cmd == nullptr) {
+    return;
+  }
+
+  uint16_t cmdNum = cmd->command_number();
+  if (cmdNum == ctx.commands.lastCommandNumber) {
+    return; // alreayd saw this
+  }
+  ctx.commands.lastCommandNumber = cmdNum;
+
+  Log.infoln("radio: command #%u -> %s", cmdNum, hprc::EnumNameCommand(cmd->command()));
+  applyRemoteCommand(cmd->command());
 }
 
 void radioLoop() {
