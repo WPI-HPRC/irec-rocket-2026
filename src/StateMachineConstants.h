@@ -8,10 +8,10 @@ constexpr float MAIN_MIN_VEL = 5;
 
 constexpr float MAIN_MAX_VEL = 9;
 
-constexpr int BOOST_TIMEOUT = 5000;
+constexpr int BOOST_TIMEOUT = 4900;
 
-constexpr int COAST_TIMEOUT = 5000;
+constexpr int COAST_TIMEOUT = 30440;
 
-constexpr int DROGUE_DESCENT_TIMEOUT = 5000;
+constexpr int DROGUE_DESCENT_TIMEOUT = 30440;
 
-constexpr int MAIN_DESCENT_TIMEOUT = 5000;
+constexpr int MAIN_DESCENT_TIMEOUT = 65000;
