@@ -167,37 +167,47 @@ void applyRemoteCommand(hprc::Command command) {
 }
 
 void handleRemoteCommands(uint8_t *rxBuff, size_t rxBuffLen) {
-  uint8_t messageLength = 0;
+  // The radio runs in broadcast mode and every node frames its packets with the
+  // same "KV0R" callsign, so the RX buffer fills with telemetry frames from
+  // other nodes (~156 bytes each) as well as the commands meant for us. The
+  // buffer drops its oldest bytes when full, so if we only consumed one frame
+  // per loop a flood of telemetry would push commands out before we read them.
+  // Drain everything currently buffered each call, keeping only RemoteControl
+  // packets. The iteration cap stops a continuous stream from starving the
+  // main loop.
+  for (int processed = 0; processed < 16 && ctx.radio.hasMessage(); processed++) {
+    uint8_t messageLength = 0;
+    if (!ctx.radio.getMessage(rxBuff, rxBuffLen, messageLength) || messageLength == 0) {
+      break;
+    }
 
-  if (!ctx.radio.hasMessage() || !ctx.radio.getMessage(rxBuff, rxBuffLen, messageLength)) {
-    return;
+    flatbuffers::Verifier verifier(rxBuff, messageLength);
+    if (!hprc::VerifyPacketBuffer(verifier)) {
+      // Likely a false frame sync: the bytes "KV0R" can appear inside binary
+      // telemetry payloads. Expected noise on a shared link, so log at trace.
+      Log.traceln("radio: skipped unverifiable frame (%d bytes)", messageLength);
+    } else {
+      const hprc::Packet *packet = hprc::GetPacket(rxBuff);
+      if (packet->packet_type() != hprc::PacketUnion_RemoteControl) {
+        // A valid packet, but telemetry from another node, not a command for us.
+        Log.traceln("radio: ignoring non-command packet (type %d)",
+                    (int)packet->packet_type());
+      } else {
+        const hprc::RemoteControlCommand *cmd = packet->packet_as_RemoteControl();
+        uint16_t cmdNum = cmd->command_number();
+        if (cmdNum != ctx.commands.lastCommandNumber) { // skip duplicates
+          ctx.commands.lastCommandNumber = cmdNum;
+          Log.infoln("radio: command #%u -> %s", cmdNum,
+                     hprc::EnumNameCommand(cmd->command()));
+          applyRemoteCommand(cmd->command());
+        }
+      }
+    }
+
+    // Re-scan the buffer so the next hasMessage()/getMessage() targets the
+    // following frame rather than re-reading stale state from this one.
+    ctx.radio.update();
   }
-
-  if (messageLength == 0 ) {
-    return;
-  }
-
-  flatbuffers::Verifier verifier(rxBuff, messageLength);
-  if (!hprc::VerifyPacketBuffer(verifier)) {
-    Log.warningln("radio: dropped malformed packet (%d bytes)", messageLength);
-    return;
-  }
-
-  const hprc::Packet *packet = hprc::GetPacket(rxBuff);
-  const hprc::RemoteControlCommand *cmd = packet->packet_as_RemoteControl();
-
-  if (cmd == nullptr) {
-    return;
-  }
-
-  uint16_t cmdNum = cmd->command_number();
-  if (cmdNum == ctx.commands.lastCommandNumber) {
-    return; // alreayd saw this
-  }
-  ctx.commands.lastCommandNumber = cmdNum;
-
-  Log.infoln("radio: command #%u -> %s", cmdNum, hprc::EnumNameCommand(cmd->command()));
-  applyRemoteCommand(cmd->command());
 }
 
 void radioLoop() {
