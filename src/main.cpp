@@ -380,6 +380,13 @@ void sensorLoop() {
       Log.warningln("LIV3F: No data (timestamp = 0)");
     }
 
+    const auto ekf_pos = ctx.estimator.get_pos_ned();
+    Log.infoln("EKF - pos: %F, %F, %F", ekf_pos(0,0), ekf_pos(1,0), ekf_pos(2,0));
+
+    const auto ekf_vel = ctx.estimator.get_vel_ned();
+    Log.infoln("EKF - vel: %F, %F, %F", ekf_vel(0, 0), ekf_vel(1, 0), ekf_vel(2, 0));
+
+
     Log.infoln("======================\n");
   }
 }

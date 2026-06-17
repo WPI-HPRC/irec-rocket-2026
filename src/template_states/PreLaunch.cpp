@@ -8,11 +8,13 @@
 
 struct PrelaunchData {
   Debouncer accelDebouncer;
+  uint32_t  lastAccelReadingTime;
 };
 
 void *prelaunchInit(StateData const *data) {
   PrelaunchData *localData = static_cast<PrelaunchData *>(malloc(sizeof(PrelaunchData)));
   localData->accelDebouncer = Debouncer(20);
+  localData->lastAccelReadingTime = 0;
 
   return localData;
 }
@@ -47,19 +49,18 @@ StateID prelaunchLoop(StateData const *data, Context *ctx, void *_localData) {
   - Check if need to abort
   - Update sensor data and ctx for next iteration?
   */
-  //    if (accel_desc.getLastUpdated() != data->lastAccelReadingTime) {
-  //        data->lastAccelReadingTime = accel_desc.getLastUpdated();
-  //        if(data->accelDebouncer.update(accel_desc.data.accel0 >
-  //        LAUNCH_TRHESHOLD, millis())) {
-  //            return BOOST;
-  //        }
-  //    }
-
-  const auto acc_vec = ctx->estimator.get_accel_prev();
-  // check acceleration in vertical direction is greater than threshold
-  if (localData->accelDebouncer.update(abs(acc_vec(0, 0)) > LAUNCH_TRHESHOLD, data->currentTime)) {
-    return BOOST;
+  if (accel_desc.getLastUpdated() != localData->lastAccelReadingTime) {
+    localData->lastAccelReadingTime = accel_desc.getLastUpdated();
+    if (localData->accelDebouncer.update(accel_desc.data.accel0 > LAUNCH_TRHESHOLD, millis())) {
+      return BOOST;
+    }
   }
+
+  // const auto acc_vec = ctx->estimator.get_accel_prev();
+  // // check acceleration in vertical direction is greater than threshold
+  // if (localData->accelDebouncer.update(abs(acc_vec(0, 0)) > LAUNCH_TRHESHOLD, data->currentTime)) {
+  //   return BOOST;
+  // }
 
   return PRELAUNCH;
 }
