@@ -335,6 +335,7 @@ void sensorLoop() {
     loop_count++;
 
     Log.infoln("=== Loop %d ===", loop_count);
+    Log.infoln("State: %d", ctx.currentState);
 
     const auto &asm330_desc = ctx.asm330.get_descriptor();
     const auto &lsm6_desc = ctx.lsm.get_descriptor();
@@ -571,7 +572,12 @@ void loop() {
   loggingLoop(&ctx);
 
   // Turn off live video if its been a while
-  if(millis() - ctx.liveVideoStart  > MAX_LIVE_VIDEO_DURATION) {
+  // if(millis() - ctx.liveVideoStart  > MAX_LIVE_VIDEO_DURATION) {
+  //   ctx.commands.remoteStartActive = false;
+  //   digitalWrite(MOSFET_GATE, LOW);
+  // }
+
+  if(millis() - ctx.boostStartTime > LIVE_VIDEO_DURATIO_AFTER_BOOST) {
     ctx.commands.remoteStartActive = false;
     digitalWrite(MOSFET_GATE, LOW);
   }

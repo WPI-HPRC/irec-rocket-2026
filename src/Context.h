@@ -38,12 +38,16 @@ struct INA219Data;
 
 #define MAX_LIVE_VIDEO_DURATION 600000
 
+#define LIVE_VIDEO_DURATIO_AFTER_BOOST 720000
+
+#define PRELAUNCH_TIME_BEFORE_VIDEO 9000000
+
 struct RemoteCommandState {
     // last applied command
     uint16_t lastCommandNumber = 0;
 
     // latched
-    bool armed = false;
+    bool armed = true;
     bool remoteStartActive = false;
 
     // one shot
@@ -79,4 +83,5 @@ struct Context {
     SplitStateEstimator estimator;
 
     int liveVideoStart;
+    uint32_t boostStartTime;
 };

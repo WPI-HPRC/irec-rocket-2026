@@ -35,6 +35,11 @@ StateID prelaunchLoop(StateData const *data, Context *ctx, void *_localData) {
   // BLA::Matrix<3, 1> gps = {gps_desc.data.ecefX, gps_desc.data.ecefY,
   //                          gps_desc.data.ecefZ};
 
+  if(data->currentTime >= PRELAUNCH_TIME_BEFORE_VIDEO) {
+    ctx->commands.remoteStartActive = true;
+    digitalWrite(MOSFET_GATE, HIGH);
+  }
+
   // Stay in PRELAUNCH if not armed
   if(!ctx->commands.armed) {
     return PRELAUNCH;
@@ -51,7 +56,10 @@ StateID prelaunchLoop(StateData const *data, Context *ctx, void *_localData) {
   */
   if (accel_desc.getLastUpdated() != localData->lastAccelReadingTime) {
     localData->lastAccelReadingTime = accel_desc.getLastUpdated();
-    if (localData->accelDebouncer.update(accel_desc.data.accel0 > LAUNCH_TRHESHOLD, millis())) {
+    float totalAccel = accel_desc.data.accel0 * accel_desc.data.accel0 +
+                       accel_desc.data.accel1 * accel_desc.data.accel1 +
+                       accel_desc.data.accel2 * accel_desc.data.accel2;
+    if (localData->accelDebouncer.update(abs(accel_desc.data.accel0) >= 25, millis())) {
       return BOOST;
     }
   }
